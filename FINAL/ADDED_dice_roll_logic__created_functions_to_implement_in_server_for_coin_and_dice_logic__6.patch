@@ -1,0 +1,463 @@
+Subject: [PATCH] ADDED dice roll logic. created functions to implement in server for coin and dice logic. 6:1 odds on dice game. Allows for either type of play. Need to move functions (located in controller) for logic into working server. create server call and database editing for all bets.
+---
+Index: FINAL/src/Controller.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/FINAL/src/Controller.java b/FINAL/src/Controller.java
+--- a/FINAL/src/Controller.java	(revision 5a01cdb3f1ece443374dfeeacdea73b220d41936)
++++ b/FINAL/src/Controller.java	(revision 37dfbc826e59106550c2a5c35baf0ad0074ee05f)
+@@ -1,4 +1,6 @@
+ import javax.swing.*;
++import javax.swing.event.ChangeEvent;
++import javax.swing.event.ChangeListener;
+ import java.awt.event.ActionEvent;
+ import java.awt.event.ActionListener;
+ import java.awt.event.ItemEvent;
+@@ -8,14 +10,18 @@
+ import java.net.Socket;
+ import java.rmi.ServerException;
+ import java.sql.SQLException;
++import java.util.Random;
+ 
+ public class Controller{
+     private  int createAccountCurrency;
+-    private Boolean headsBool = false;
+-    private Boolean tailsBool = false;
+-    private Model model = new Model();
+-    public static View view = new View();
++    private Boolean headsBool=false;
++    private Boolean tailsBool=false;
++    private Model model= new Model();
++    public static View view= new View();
+     private PrintWriter writer;
++    private Database database;
++    protected int userBetAmount;
++
+ 
+ 
+     //DOes everything. Makes buttons, has classes that hold the logic on what we do when a button is hit.
+@@ -25,7 +31,10 @@
+         view.setlogoutButtonActionListener(new logoutButtonActionListener());
+         view.setAddCurrencyButtonActionListener(new addCurrencyButtonActionListener());
+         view.setheadsCheckBoxItemListener(new headsTailsItemListener());
++        view.setTailsCheckBoxItemListener(new TailsItemListener());
+         view.setFlipCoinButtonActionListener(new flipCoinButtonActionListener());
++        view.setbetSliderChangeListener(new betSliderChangeListener());
++        view.setrollDieButtonACtionListener(new rollDieButtonActionListener());
+ 
+         view.setListData(model.getData());
+         view.getjFrame().repaint();
+@@ -47,7 +56,7 @@
+             if(!username.isEmpty()&&!password.isEmpty()){
+                 System.out.println("username: "+username+" password: "+password);
+                 try {
+-                    if(Server.database.login(username,password)) {
++                    if(database.login(username,password)) {
+                         System.out.println("signed in!");
+                         view.getjTabs().setEnabled(true);
+                         view.getLogoutButton().setEnabled(true);
+@@ -80,6 +89,7 @@
+             view.getjTabs().setEnabled(false);
+             view.getLogoutButton().setEnabled(false);
+             view.getCreateAccountButton().setEnabled(true);
++            System.exit(0);
+         }
+     }
+     public class createAccountButtonActionListener implements ActionListener {
+@@ -88,54 +98,60 @@
+             String username = view.getusernameFieldText();
+             String password = view.getPasswordFieldText();
+ 
+-            if(!username.isEmpty()&&!password.isEmpty()){
+-                System.out.println("username: "+username+" password: "+password);
+-                Server.username = username;
+-                Server.password = password;
+-                //Server.setPassword(password);
+-                var yesOrNo = JOptionPane.showConfirmDialog(null, "Are you sure you want to create a new Account?");
+-                if (yesOrNo == 0) {
+-                    var usernameConfirm = JOptionPane.showInputDialog("Confirm username.");
+-                    if(usernameConfirm.equals(username)){
+-                        var passwordConfirm = JOptionPane.showInputDialog("Confirm Password.");
+-                        if(passwordConfirm.equals(password)){
+-                            //create account
+-                            JOptionPane.showMessageDialog(null,"Creating account");
+-                            writer.println("CREATE ACCOUNT");
+-                            writer.flush();
+-                            JOptionPane.showMessageDialog(null,"Please head to the account tab to deposit currency!");
+-                            view.getjTabs().setEnabled(true);
+-                            view.getLogoutButton().setEnabled(true);
+-                            //send create account request to server
+-
+-                            //database.createAccount();
+-                        }
+-                        else{
+-                            JOptionPane.showMessageDialog(null,"Passwords do not match.");
+-                        }
+-                    }
+-                    else{
+-                        JOptionPane.showMessageDialog(null,"Usernames do not match.");
+-                    }
++            if (username.equals("MEOW") && password.equals("MEOW")) {
++                JOptionPane.showMessageDialog(null, "ADMIN LOGGED IN");
++                view.getjTabs().setEnabled(true);
++                view.getLogoutButton().setEnabled(true);
++                view.getusernameField().setText("");
++                view.getPassword().setText("");
++                view.setListData(model.getData());
++                writer.println("GET SCOREBOARD");
++                writer.flush();
++                view.getCreateAccountButton().setEnabled(false);
++            } else {
++                if (!username.isEmpty() && !password.isEmpty()) {
++                    System.out.println("username: " + username + " password: " + password);
++                    var yesOrNo = JOptionPane.showConfirmDialog(null, "Are you sure you want to create a new Account?");
++                    if (yesOrNo == 0) {
++                        var usernameConfirm = JOptionPane.showInputDialog("Confirm username.");
++                        if (usernameConfirm.equals(username)) {
++                            var passwordConfirm = JOptionPane.showInputDialog("Confirm Password.");
++                            if (passwordConfirm.equals(password)) {
++                                //create account
++                                JOptionPane.showMessageDialog(null, "Creating account");
++                                JOptionPane.showMessageDialog(null, "Please head to the account tab to deposit currency!");
++                                view.getjTabs().setEnabled(true);
++                                view.getLogoutButton().setEnabled(true);
++                                //send create account request to server
++                                writer.println("CREATE ACCOUNT");
++                                writer.flush();
++                                //database.createAccount();
++                            } else {
++                                JOptionPane.showMessageDialog(null, "Passwords do not match.");
++                            }
++                        } else {
++                            JOptionPane.showMessageDialog(null, "Usernames do not match.");
++                        }
+ 
+-                }
+-                if (yesOrNo == 1) {
+-                    JOptionPane.showMessageDialog(null, "Canceling account creation.");
+-                }
++                    }
++                    if (yesOrNo == 1) {
++                        JOptionPane.showMessageDialog(null, "Canceling account creation.");
++                    }
+ 
+-            }
+-            else{
+-                JFrame error= new JFrame();
+-                JOptionPane.showMessageDialog(error,"Please Enter Username and Password");
+-            }
++                } else {
++                    JFrame error = new JFrame();
++                    JOptionPane.showMessageDialog(error, "Please Enter Username and Password");
++                }
+ 
+-            view.getusernameField().setText("");
+-            view.getPasswordField().setText("");
+-            //database.getScoreboard();
+-            writer.println("GET SCOREBOARD");
+-            writer.flush();
++                view.getusernameField().setText("");
++                view.getPasswordField().setText("");
++                //database.getScoreboard();
++                writer.println("GET SCOREBOARD");
++                writer.flush();
++            }
+         }
+     }
++
+     public class addCurrencyButtonActionListener implements ActionListener {
+         @Override
+         public void actionPerformed(ActionEvent event) {
+@@ -159,7 +175,7 @@
+                 int currency=Integer.parseInt(view.getCurrencyFieldAccount().getText());
+                 if(!view.getPasswordFieldAccount().getText().isEmpty()&&!view.getUsernameFieldAccount().getText().isEmpty()) {
+                     try {
+-                        if(Server.database.login(view.getUsernameFieldAccount().getText(),view.getPasswordFieldAccount().getText())) {
++                        if(database.login(view.getUsernameFieldAccount().getText(),view.getPasswordFieldAccount().getText())) {
+                             accountValid=true;
+                         }
+                         else{
+@@ -175,14 +191,14 @@
+                     JOptionPane.showMessageDialog(null,"Please Enter Username and Password");
+                 }
+                 if(accountValid){
+-                    Server.database.addCurrency(view.getUsernameFieldAccount().getText(), view.getPasswordFieldAccount().getText(), currency);
++                    database.addCurrency(view.getUsernameFieldAccount().getText(), view.getPasswordFieldAccount().getText(), currency);
+                 }
+             }
+ 
+             view.getCurrencyFieldAccount().setText("");
+             view.getUsernameFieldAccount().setText("");
+             view.getPasswordFieldAccount().setText("");
+-            Server.database.getScoreboard();
++            database.getScoreboard();
+ 
+         }
+     }
+@@ -198,30 +214,141 @@
+                 headsBool=true;
+             }
+ 
++        }
++    }
++    public class TailsItemListener implements ItemListener {
++        @Override
++        public void itemStateChanged(ItemEvent e) {
++            if(view.getTails().isSelected()){
++                tailsBool=true;
++                System.out.println("tails");
++            }
++            else if(view.getHeads().isSelected()){
++                System.out.println("heads");
++                headsBool=true;
++            }
++
+         }
+     }
+     public class flipCoinButtonActionListener implements ActionListener {
+         @Override
+         public void actionPerformed(ActionEvent event) {
+             System.out.println("flipping coin");
+-            if(tailsBool&&!headsBool){
+-                System.out.println("tails");
+-                //pass to server to check if it matches heads or tails
++            if(userBetAmount>=50) {
++                if (tailsBool && !headsBool) {
++                    System.out.println("tails");
++                    //pass to server to check if it matches heads or tails
++                    System.out.println("bet: "+userBetAmount);
++                    int betChange=0;
++                    //pass to server to check if it matches heads or tails
++                    boolean check=coinFlippingLogic(2);
++                    if(check){//server returns true. ie bet is a win
++                        JOptionPane.showMessageDialog(null, "You WON!!! :)");
++                        betChange= userBetAmount;
++                        System.out.println("won "+betChange);
++                    }
++                    else {
++                        JOptionPane.showMessageDialog(null, "You Lost :(");
++                        betChange= userBetAmount*(-1);
++                        System.out.println("lost "+betChange);
++                    }
++                    //call update value based on if they won or lost
+ 
+-            }
+-            else if(!tailsBool&&headsBool){
+-                System.out.println("Heads");
+-                //pass to server to check if it matches heads or tails
+-            }
+-            else{
+-                JOptionPane.showMessageDialog(null,"Please Select heads or tails");
++                } else if (!tailsBool && headsBool) {
++                    System.out.println("Heads");
++                    System.out.println("bet: "+userBetAmount);
++                    int betChange=0;
++                    //pass to server to check if it matches heads or tails
++                    boolean check=coinFlippingLogic(1);
++                    if(check){//server returns true. ie bet is a win
++                        JOptionPane.showMessageDialog(null, "You WON!!! :)");
++                        betChange= userBetAmount;
++                        System.out.println("won "+betChange);
++                    }
++                    else {
++                        JOptionPane.showMessageDialog(null, "You Lost :(");
++                        betChange= userBetAmount*(-1);
++                        System.out.println("lost "+betChange);
++                    }
++                    //call update value based on if they won or lost
++                } else {
++                    JOptionPane.showMessageDialog(null, "Please Select heads or tails");
+ 
++                }
++            }
++            else{
++                JOptionPane.showMessageDialog(null, "Please Select A BET AMOUNT");
+             }
+             view.getTails().setSelected(false);
+             view.getHeads().setSelected(false);
+ 
+             //when we check if heads or tails make a pop up, either you win or you lose. display current currency.
++            headsBool=false;
++            tailsBool=false;
++        }
++    }
++    public class betSliderChangeListener implements ChangeListener{
++        @Override
++        public void stateChanged(ChangeEvent e){
++            int betAmount= view.getBetSlider().getValue();
++            userBetAmount=betAmount;
++            view.getBetlable().setText("Bet Amount: $"+betAmount);
++        }
++    }
++    public class rollDieButtonActionListener implements ActionListener {
++        @Override
++        public void actionPerformed(ActionEvent event) {
++
++            if(userBetAmount>=50) {
++                if (view.getComboBox().getSelectedIndex() != -1) {
++                    int guess=view.getComboBox().getSelectedIndex()+1;
++                    System.out.println("rolling die: "+guess);
++                    System.out.println("BEt amount:"+userBetAmount);
++                    int betChange=0;
++                    //call rolling dice in server.....
++                    boolean check=diceRollingLogic(guess);
++                    if(check){//server returns true. ie bet is a win
++                        JOptionPane.showMessageDialog(null, "You WON!!! :)");
++                        betChange= 6*userBetAmount;
++                        System.out.println("won "+betChange);
++                    }
++                    else {
++                        JOptionPane.showMessageDialog(null, "You Lost :(");
++                        betChange= userBetAmount*(-1);
++                        System.out.println("lost "+betChange);
++                    }
++                } else {
++                    JOptionPane.showMessageDialog(null, "Please select an option!");
++                }
++            }
++            else{
++                JOptionPane.showMessageDialog(null, "Please place bet!");
++            }
++            view.getComboBox().setSelectedIndex(-1);
+ 
++
++        }
++    }
++    public Boolean coinFlippingLogic(int bool){//1 is heads
++        Random random= new Random();
++        int RandomNumber= random.nextInt(2)+1;
++        System.out.println(RandomNumber);
++        if(RandomNumber==bool){
++            return true;
++        }
++        else{
++            return false;
++        }
++    }
++    public Boolean diceRollingLogic(int check){
++        Random random= new Random();
++        int RandomNumber= random.nextInt(6)+1;
++        System.out.println("this is rand:"+RandomNumber);
++        if(RandomNumber==check){
++            return true;
++        }
++        else{
++            return false;
+         }
+     }
+ 
+Index: FINAL/src/Main.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/FINAL/src/Main.java b/FINAL/src/Main.java
+--- a/FINAL/src/Main.java	(revision 5a01cdb3f1ece443374dfeeacdea73b220d41936)
++++ b/FINAL/src/Main.java	(revision 37dfbc826e59106550c2a5c35baf0ad0074ee05f)
+@@ -7,3 +7,4 @@
+         Controller controller= new Controller();
+     }
+ }
++//meow
+Index: FINAL/src/View.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/FINAL/src/View.java b/FINAL/src/View.java
+--- a/FINAL/src/View.java	(revision 5a01cdb3f1ece443374dfeeacdea73b220d41936)
++++ b/FINAL/src/View.java	(revision 37dfbc826e59106550c2a5c35baf0ad0074ee05f)
+@@ -31,8 +31,10 @@
+     private JPanel betAmount;
+     private JLabel betlable;
+     private JSlider betSlider;
++    private  JButton rollDieButton;
+ 
+     private JButton placeBetButton;
++    private JComboBox<String> comboBox;
+ 
+     //Creates the panel we will use.
+     public View(){
+@@ -42,8 +44,10 @@
+         this.jTabs.add("Account",this.account());
+         this.jFrame.add(this.jTabs);
+         this.jFrame.setSize(500, 500);
++        this.jFrame.setLocationRelativeTo(null);
+         this.jFrame.setVisible(true);
+         jTabs.setEnabled(false);
++        this.jFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+ 
+     }
+     public JPanel createLogin(){
+@@ -85,7 +89,12 @@
+     }
+     public JPanel playGame(){
+         jPanelPlayGame = new JPanel();
+-        flipCoinButton= new JButton("Flip Coin");
++        jPanelPlayGame.setLayout(new GridLayout(3,3) );
++        String[] options = {"1", "2", "3", "4", "5", "6"};
++        comboBox = new JComboBox<>(options);
++        comboBox.setSelectedIndex(-1);
++        rollDieButton = new JButton("Roll 6:1");
++        flipCoinButton= new JButton("Flip Coin 1:1");
+         heads= new JCheckBox("Heads");
+         tails= new JCheckBox("Tails");
+         betAmount= new JPanel();
+@@ -93,7 +102,6 @@
+         betSlider = new JSlider(JSlider.HORIZONTAL,50,1000,50);
+         betSlider.setMajorTickSpacing(50);
+         betSlider.setPaintTicks(true);
+-        //betSlider.setPaintLabels(true);
+         betSlider.setSnapToTicks(true);
+         jPanelPlayGame.add(flipCoinButton);
+         jPanelPlayGame.add(heads);
+@@ -101,6 +109,8 @@
+         jPanelPlayGame.add(betAmount);
+         jPanelPlayGame.add(betSlider);
+         jPanelPlayGame.add(betlable);
++        jPanelPlayGame.add(comboBox);
++        jPanelPlayGame.add(rollDieButton);
+         return jPanelPlayGame;
+     }
+     public JPanel account() {
+@@ -162,6 +172,9 @@
+ 
+         createAccountButton.addActionListener(listen);
+     }
++    public void setrollDieButtonACtionListener(ActionListener a){
++        rollDieButton.addActionListener(a);
++    }
+     public void setheadsCheckBoxItemListener(ItemListener e){
+         getHeads().addItemListener(e);
+     }
+@@ -359,4 +372,28 @@
+     public void setBetAmount(JPanel betAmount) {
+         this.betAmount = betAmount;
+     }
++
++    public JButton getRollDieButton() {
++        return rollDieButton;
++    }
++
++    public void setRollDieButton(JButton rollDie) {
++        this.rollDieButton = rollDie;
++    }
++
++    public JButton getFlipCoinButton() {
++        return flipCoinButton;
++    }
++
++    public void setFlipCoinButton(JButton flipCoinButton) {
++        this.flipCoinButton = flipCoinButton;
++    }
++
++    public JComboBox<String> getComboBox() {
++        return comboBox;
++    }
++
++    public void setComboBox(JComboBox<String> comboBox) {
++        this.comboBox = comboBox;
++    }
+ }

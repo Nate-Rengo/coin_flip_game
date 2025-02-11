@@ -1,0 +1,126 @@
+Subject: [PATCH] Uncommitted changes before Update at 4/17/24, 12:51 PM [Changes]
+---
+Index: FINAL/src/Controller.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/FINAL/src/Controller.java b/FINAL/src/Controller.java
+--- a/FINAL/src/Controller.java	
++++ b/FINAL/src/Controller.java	
+@@ -18,18 +18,20 @@
+     public class loginButtonActionListener implements ActionListener {
+         @Override
+         public void actionPerformed(ActionEvent event) {
+-            String username= view.getusernameText();
+-            String password= view.getPasswordText();
++            String username= view.getusernameFieldText();
++            String password= view.getPasswordFieldText();
+ 
+             if(!username.isEmpty()&&!password.isEmpty()){
+                 System.out.println("username: "+username+" password: "+password);
++                view.getjTabs().setEnabled(true);
++                view.getLogoutButton().setEnabled(true);
+             }
+             else{
+                 JFrame error= new JFrame();
+-                JOptionPane.showMessageDialog(error,"Please Enter UserName and Password");
++                JOptionPane.showMessageDialog(error,"Please Enter Username and Password");
+             }
+ 
+-            view.getusername().setText("");
++            view.getusernameField().setText("");
+             view.getPassword().setText("");
+             view.setListData(model.getData());
+ 
+@@ -39,14 +41,16 @@
+         @Override
+         public void actionPerformed(ActionEvent event) {
+             System.out.println("logging out");
++            view.getjTabs().setEnabled(false);
++            view.getLogoutButton().setEnabled(false);
+ 
+         }
+     }
+     public class createAccountButtonActionListener implements ActionListener {
+         @Override
+         public void actionPerformed(ActionEvent event) {
+-            String username= view.getusernameText();
+-            String password= view.getPasswordText();
++            String username= view.getusernameFieldText();
++            String password= view.getPasswordFieldText();
+ 
+             if(!username.isEmpty()&&!password.isEmpty()){
+                 System.out.println("username: "+username+" password: "+password);
+@@ -58,6 +62,21 @@
+                         if(passwordConfirm.equals(password)){
+                             //create account
+                             JOptionPane.showMessageDialog(null,"Creating account");
++                            var currencyDeposit= JOptionPane.showInputDialog("Enter currency deposit");
++                            boolean good=false;
++                            try {
++                                Integer.parseInt(currencyDeposit);
++                                good=true;
++                                //call database create account. Use usernameConfirm, passwordConfirm, and currencyDeposit
++                            }
++                            catch (NumberFormatException x) {
++                                good=false;
++                                var currencyDepositAttempt2= JOptionPane.showInputDialog("Enter A valid currency deposit");
++                                //call database create account. Use usernameConfirm, passwordConfirm, and currencyDepositAttempt2
++                            }
++
++                            view.getjTabs().setEnabled(true);
++                            view.getLogoutButton().setEnabled(true);
+                         }
+                         else{
+                             JOptionPane.showMessageDialog(null,"Passwords do not match.");
+@@ -78,8 +97,8 @@
+                 JOptionPane.showMessageDialog(error,"Please Enter Username and Password");
+             }
+ 
+-            view.getusername().setText("");
+-            view.getPassword().setText("");
++            view.getusernameField().setText("");
++            view.getPasswordField().setText("");
+         }
+     }
+     public class addCurrencyButtonActionListener implements ActionListener {
+@@ -87,6 +106,37 @@
+         public void actionPerformed(ActionEvent event) {
+            System.out.println("adding monney");
+ 
++            boolean good=false;
++            try {
++                Integer.parseInt(view.getCurrencyField().getText());
++                good=true;
++                System.out.println("Currency deposited: "+view.getCurrencyField().getText());
++                //call database input currency
++            }
++            catch (NumberFormatException x) {
++                good=false;
++                JOptionPane.showMessageDialog(null,"Enter A valid currency deposit");
++
++            }
++            view.getCurrencyField().setText("");
++
++
+         }
+     }
++
++    public View getView() {
++        return view;
++    }
++
++    public void setView(View view) {
++        this.view = view;
++    }
++
++    public Model getModel() {
++        return model;
++    }
++
++    public void setModel(Model model) {
++        this.model = model;
++    }
+ }
+\ No newline at end of file
